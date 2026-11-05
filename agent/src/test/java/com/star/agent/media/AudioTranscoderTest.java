@@ -19,12 +19,23 @@ class AudioTranscoderTest {
     @TempDir
     Path tmpDir;
 
-    // 假 ffmpeg：批处理把输入文件复制成输出文件（模拟"转码成功"）；参数位置固定同真实命令
+    // 假 ffmpeg：把输入文件复制成输出文件（模拟"转码成功"）；参数位置固定同真实命令
     // 真实命令：ffmpeg -y -i <in> -ar 16000 -ac 1 <out>  → 输入是第 3 个参数，输出是第 8 个
+    // Windows 用 .bat，Linux/macOS 用 .sh（CI 是 Ubuntu，不能执行 .bat）
     private Path fakeFfmpeg() throws Exception {
-        Path bat = tmpDir.resolve("fake-ffmpeg.bat");
-        Files.writeString(bat, "@echo off\r\ncopy /y \"%~3\" \"%~8\" >nul\r\n");
-        return bat;
+        if (isWindows()) {
+            Path bat = tmpDir.resolve("fake-ffmpeg.bat");
+            Files.writeString(bat, "@echo off\r\ncopy /y \"%~3\" \"%~8\" >nul\r\n");
+            return bat;
+        }
+        Path sh = tmpDir.resolve("fake-ffmpeg.sh");
+        Files.writeString(sh, "#!/bin/sh\ncp \"$3\" \"$8\"\n");
+        assertTrue(sh.toFile().setExecutable(true), "假 ffmpeg 脚本应可执行");
+        return sh;
+    }
+
+    private boolean isWindows() {
+        return System.getProperty("os.name", "").toLowerCase().contains("win");
     }
 
     @Test
@@ -50,9 +61,16 @@ class AudioTranscoderTest {
     @Test
     void transcode_failingFfmpeg_returnsNull() throws Exception {
         // 假 ffmpeg 输出失败码 1：验证"转码失败"同样降级
-        Path bat = tmpDir.resolve("fail-ffmpeg.bat");
-        Files.writeString(bat, "@echo off\r\nexit /b 1\r\n");
-        AudioTranscoder transcoder = new AudioTranscoder(bat.toString(), tmpDir);
+        Path script;
+        if (isWindows()) {
+            script = tmpDir.resolve("fail-ffmpeg.bat");
+            Files.writeString(script, "@echo off\r\nexit /b 1\r\n");
+        } else {
+            script = tmpDir.resolve("fail-ffmpeg.sh");
+            Files.writeString(script, "#!/bin/sh\nexit 1\n");
+            assertTrue(script.toFile().setExecutable(true), "假 ffmpeg 脚本应可执行");
+        }
+        AudioTranscoder transcoder = new AudioTranscoder(script.toString(), tmpDir);
 
         assertNull(transcoder.to16kWav(new byte[]{1, 2, 3}));
     }

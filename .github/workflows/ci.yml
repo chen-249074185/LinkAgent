@@ -49,12 +49,13 @@ jobs:
       - name: Test
         env:
           MYSQL_PASSWORD: root
-          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/linkagent?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8
+          SPRING_DATASOURCE_URL: "jdbc:mysql://127.0.0.1:3306/linkagent?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8"
           SPRING_DATASOURCE_USERNAME: root
           SPRING_DATASOURCE_PASSWORD: root
           SPRING_DATA_REDIS_HOST: 127.0.0.1
           SPRING_DATA_REDIS_PORT: 6379
           JWT_SECRET: ci-only-secret-key-0123456789-abcdefghij
+          ADMIN_TOKEN_WEB: ci-admin-token
           LINKAGENT_WECHAT_BOT_ENABLED: 'false'
         run: mvn -B -pl agent test
 
