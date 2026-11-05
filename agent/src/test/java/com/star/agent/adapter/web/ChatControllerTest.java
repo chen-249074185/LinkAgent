@@ -103,10 +103,14 @@ class ChatControllerTest {
             return null;
         }).when(chatService).streamWithTools(anyString(), any(), any(), anyString(), any(), any());
 
-        mockMvc.perform(get("/api/chat/stream").param("message", "北京天气"))
-                .andExpect(status().isOk())
-                // SSE 响应头无 charset，MockMvc 按 ISO-8859-1 解码中文会乱码 → 用字节按 UTF-8 解码后断言
-                .andExpect(result -> {
+        // 控制器用 CompletableFuture 异步写 SSE，CI 上可能还没写完就断言 → 轮询等待响应体
+        org.springframework.test.web.servlet.MvcResult result =
+                mockMvc.perform(get("/api/chat/stream").param("message", "北京天气"))
+                        .andExpect(status().isOk())
+                        .andReturn();
+        org.awaitility.Awaitility.await()
+                .atMost(5, java.util.concurrent.TimeUnit.SECONDS)
+                .untilAsserted(() -> {
                     String body = new String(result.getResponse().getContentAsByteArray(),
                             java.nio.charset.StandardCharsets.UTF_8);
                     org.hamcrest.MatcherAssert.assertThat(body,
