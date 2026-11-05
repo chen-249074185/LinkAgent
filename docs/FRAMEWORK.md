@@ -20,7 +20,7 @@
 | 类型 | 用途 | 代表 | 是否进 Workflow |
 |---|---|---|---|
 | MAIN | 租房主线配套 | rag_search / crawl_listings / liepin_jobs / commute_estimate / house_score / rent_risk | ✅ |
-| SCENE | 租房支线 | uu_quote | 可选 |
+| SCENE | 租房支线 | uu_quote（Mock 占位） | 可选 |
 | EXT | 架构验证通用 | get_weather | ❌ 拦截 |
 
 ## 三、新增一个技能（三步）
