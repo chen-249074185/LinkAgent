@@ -1,7 +1,9 @@
 package com.star.agent.infra.web;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -48,6 +50,16 @@ public class GlobalExceptionHandler {
         return Result.fail(400, "请求体缺失或格式错误");
     }
 
+    // @Valid 校验失败：只回第一个字段错误，话术直接可展示
+    @ExceptionHandler(org.springframework.web.bind.MethodArgumentNotValidException.class)
+    public Result<Void> invalidParam(org.springframework.web.bind.MethodArgumentNotValidException e) {
+        String msg = e.getBindingResult().getFieldErrors().stream()
+                .findFirst()
+                .map(err -> err.getField() + " " + err.getDefaultMessage())
+                .orElse("参数不合法");
+        return Result.fail(400, msg);
+    }
+
     // 上传超过 Tomcat multipart 上限（50MB）→ 友好话术，不是"服务器内部错误"
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public Result<Void> uploadTooLarge(MaxUploadSizeExceededException e) {
@@ -55,10 +67,32 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public Result<Void> other(Exception e, jakarta.servlet.http.HttpServletRequest request) {
+    public Result<Void> other(Exception e, jakarta.servlet.http.HttpServletRequest request,
+                              HttpServletResponse response) {
         String qs = request.getQueryString();
         logger.error("未处理异常: {} {}{}", request.getMethod(), request.getRequestURI(),
                 qs != null ? "?" + qs : "", e);   // 完整日志栈（含 traceId，MDC 已写入）
+
+        // SSE（text/event-stream）响应不能写 JSON：强行写会二次抛
+        // HttpMessageNotWritableException，把一条普通异常放大成满屏堆栈。
+        // 这类响应已在 ChatController 里以事件形式收尾，这里只记日志、不再写 body。
+        if (response.isCommitted()) {
+            return null;   // 响应已提交：任何写入都会二次抛，交回容器收尾
+        }
+        if (isEventStream(request, response)) {
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);   // SSE 只给状态码，不写 JSON
+            return null;
+        }
         return Result.fail(500, "服务器内部错误");
+    }
+
+    private boolean isEventStream(jakarta.servlet.http.HttpServletRequest request,
+                                  HttpServletResponse response) {
+        String contentType = response.getContentType();
+        if (contentType != null && contentType.startsWith(MediaType.TEXT_EVENT_STREAM_VALUE)) {
+            return true;
+        }
+        String accept = request.getHeader("Accept");
+        return accept != null && accept.contains(MediaType.TEXT_EVENT_STREAM_VALUE);
     }
 }

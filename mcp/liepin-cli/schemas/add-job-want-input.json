@@ -1,0 +1,50 @@
+{
+  "title": "AddJobWantInputSchema",
+  "description": "新增求职期望接口 /add-job-want 入参",
+  "type": "object",
+  "properties": {
+    "industries": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "行业名称列表"
+    },
+    "jobtitle": {
+      "type": "string",
+      "description": "职能/职位类别名称"
+    },
+    "dq": {
+      "type": "string",
+      "description": "期望地点名称"
+    },
+    "wantSalaryLow": {
+      "type": "number",
+      "description": "期望薪资下限（元）"
+    },
+    "wantSalaryHigh": {
+      "type": "number",
+      "description": "期望薪资上限（元）"
+    },
+    "wantSalaryMonths": {
+      "type": "number",
+      "description": "期望薪资月数"
+    },
+    "workType": {
+      "type": "string",
+      "description": "学生期望工作类型。允许取值及含义：0-应届，1-实习"
+    },
+    "otherExpectDqs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "感兴趣的期望地点名称列表"
+    },
+    "workweek": {
+      "type": "number",
+      "description": "每周工作天数"
+    },
+    "practiceMonths": {
+      "type": "number",
+      "description": "实习月数"
+    }
+  },
+  "required": ["jobtitle", "dq"]
+}

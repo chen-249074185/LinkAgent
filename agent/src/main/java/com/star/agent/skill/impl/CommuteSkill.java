@@ -23,6 +23,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -39,12 +40,15 @@ public class CommuteSkill implements Skill {
     private static final String DEFAULT_BASE_URL = "https://restapi.amap.com/v3/direction/driving";
     private static final String DEFAULT_GEOCODE_URL = "https://restapi.amap.com/v3/geocode/geo";
     private static final String COORD_PATTERN = "-?\\d+(\\.\\d+)?,-?\\d+(\\.\\d+)?";
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
 
     private final String baseUrl;
     private final String geocodeUrl;
     private final String apiKey;
     private final McpConnection ragConnection;   // null=无 rag 连接（mock 模式/手动链路）→ 直接调高德无缓存
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(REQUEST_TIMEOUT)
+            .build();
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Autowired
@@ -114,6 +118,7 @@ public class CommuteSkill implements Skill {
                     + "&destination=" + URLEncoder.encode(destLoc, StandardCharsets.UTF_8);
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
+                    .timeout(REQUEST_TIMEOUT)
                     .GET()
                     .build();
             HttpResponse<String> resp = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -202,6 +207,7 @@ public class CommuteSkill implements Skill {
                     + "&address=" + URLEncoder.encode(name, StandardCharsets.UTF_8);
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
+                    .timeout(REQUEST_TIMEOUT)
                     .GET()
                     .build();
             HttpResponse<String> resp = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -229,6 +235,7 @@ public class CommuteSkill implements Skill {
                     + "&keywords=" + URLEncoder.encode(name, StandardCharsets.UTF_8);
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
+                    .timeout(REQUEST_TIMEOUT)
                     .GET()
                     .build();
             HttpResponse<String> resp = httpClient.send(request, HttpResponse.BodyHandlers.ofString());

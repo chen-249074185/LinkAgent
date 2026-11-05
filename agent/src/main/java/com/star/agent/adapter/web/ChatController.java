@@ -127,9 +127,23 @@ public class ChatController {
                             });
                     emitter.complete();                                         // 正常推完
                 } catch (Exception e) {
-                    // 只有"真报错"才 completeWithError；主动停止/断线不算错，静默结束即可
-                    if (!"stream stopped".equals(e.getMessage())) {
-                        emitter.completeWithError(e);
+                    // 主动停止：/stop 已经 complete 过喇叭，这里静默退出即可
+                    if ("stream stopped".equals(e.getMessage())) {
+                        return;
+                    }
+                    // 真报错：先把友好提示作为普通 data 事件推给前端，再正常 complete。
+                    // 不走 completeWithError —— 那会触发 Spring 错误页往 text/event-stream 里写 JSON，
+                    // 二次抛 HttpMessageNotWritableException，日志被满屏堆栈淹没。
+                    logger.error("流式对话异常: {}", e.getMessage(), e);
+                    try {
+                        emitter.send(SseEmitter.event().data("\n\n抱歉，服务暂时不可用，请稍后再试。"));
+                    } catch (Exception ignored) {
+                        // 浏览器已断开/响应已提交，推不出去就算了
+                    }
+                    try {
+                        emitter.complete();
+                    } catch (Exception ignored) {
+                        // 已结束的流重复 complete 无副作用
                     }
                 }
             } finally {

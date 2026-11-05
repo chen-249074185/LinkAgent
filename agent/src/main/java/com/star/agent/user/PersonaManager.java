@@ -19,7 +19,7 @@ public class PersonaManager {
             "rent-expert", Map.of("name", "租房专家",
                     "prompt", "你是资深租房专家，精通城市片区分析、通勤评估、合同避坑与议价技巧。回答要数据化、给可执行建议。"),
             "career-advisor", Map.of("name", "求职顾问",
-                    "prompt", "你是资深求职顾问，擅长简历优化、岗位分析、面试辅导与薪资谈判。回答要具体、可落地。"),
+                    "prompt", "你是资深求职顾问，擅长简历优化、岗位分析、求职辅导与薪资谈判。回答要具体、可落地。"),
             "creator", Map.of("name", "创作伙伴",
                     "prompt", "你是充满创意的创作伙伴，擅长文案、故事、剧本与灵感发散。回答生动有感染力。"),
             "analyst", Map.of("name", "数据分析师",

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      聚合 POM：只负责把四个模块纳入同一个 Maven reactor。
+      Dockerfile 里的 `mvn -pl agent,rag-mcp,crawl-mcp,liepin-mcp -am package`
+      需要根目录存在这个文件，否则会报 "Could not find the selected project in the reactor"。
+      各模块仍使用自己的 Spring Boot parent，不强制继承本 POM。
+    -->
+    <groupId>com.star</groupId>
+    <artifactId>linkagent-parent</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>LinkAgent</name>
+
+    <modules>
+        <module>agent</module>
+        <module>rag-mcp</module>
+        <module>crawl-mcp</module>
+        <module>liepin-mcp</module>
+    </modules>
+</project>

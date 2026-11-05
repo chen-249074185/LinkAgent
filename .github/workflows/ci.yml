@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: linkagent
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Init MySQL schema
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq default-mysql-client
+          mysql -h 127.0.0.1 -uroot -proot < deploy/mysql/init.sql
+
+      - name: Test
+        env:
+          MYSQL_PASSWORD: root
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/linkagent?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: root
+          SPRING_DATA_REDIS_HOST: 127.0.0.1
+          SPRING_DATA_REDIS_PORT: 6379
+          JWT_SECRET: ci-only-secret-key-0123456789-abcdefghij
+          LINKAGENT_WECHAT_BOT_ENABLED: 'false'
+        run: mvn -B -pl agent test
+
+      - name: Package all modules
+        run: mvn -B -DskipTests package
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco
+          path: agent/target/site/jacoco
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t linkagent:ci .

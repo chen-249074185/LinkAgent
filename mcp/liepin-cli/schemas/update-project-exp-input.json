@@ -1,0 +1,44 @@
+{
+  "title": "UpdateProjectExpInputSchema",
+  "description": "更新项目经历接口 /update-project-exp 入参",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "number",
+      "description": "项目经历 ID，更新时必填"
+    },
+    "name": {
+      "type": "string",
+      "description": "项目名称"
+    },
+    "start": {
+      "type": "string",
+      "description": "项目开始时间，格式 YYYYMM"
+    },
+    "end": {
+      "type": "string",
+      "description": "项目结束时间，格式 YYYYMM"
+    },
+    "compName": {
+      "type": "string",
+      "description": "公司名称"
+    },
+    "position": {
+      "type": "string",
+      "description": "担任职务"
+    },
+    "descr": {
+      "type": "string",
+      "description": "项目描述"
+    },
+    "duty": {
+      "type": "string",
+      "description": "项目职责"
+    },
+    "achievement": {
+      "type": "string",
+      "description": "项目业绩"
+    }
+  },
+  "required": ["id"]
+}

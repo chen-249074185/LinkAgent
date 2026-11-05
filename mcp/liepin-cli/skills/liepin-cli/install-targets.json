@@ -1,0 +1,53 @@
+{
+  "skillName": "liepin-cli",
+  "targets": [
+    {
+      "id": "cursor-project",
+      "platform": "Cursor Project",
+      "install_root": "<project>/.cursor/skills",
+      "copy_from": "skills/liepin-cli",
+      "status": "documented",
+      "notes": "Copy the liepin-cli folder from the repo into the project-level skills directory."
+    },
+    {
+      "id": "cursor-home",
+      "platform": "Cursor Home",
+      "install_root": "~/.cursor/skills",
+      "copy_from": "skills/liepin-cli",
+      "status": "documented",
+      "notes": "Use this when you want the skill available across Cursor workspaces."
+    },
+    {
+      "id": "claude-home",
+      "platform": "Claude Code",
+      "install_root": "~/.claude/skills",
+      "copy_from": "skills/liepin-cli",
+      "status": "documented",
+      "notes": "Copy the liepin-cli folder into the Claude Code skills root."
+    },
+    {
+      "id": "codex-home",
+      "platform": "Codex",
+      "install_root": "<codex-skill-root>",
+      "copy_from": "skills/liepin-cli",
+      "status": "documented",
+      "notes": "Use the skills root configured by your Codex environment, then copy the liepin-cli folder into it."
+    },
+    {
+      "id": "opencode-home",
+      "platform": "OpenCode / OpenClaw-compatible",
+      "install_root": "<opencode-skill-root>",
+      "copy_from": "skills/liepin-cli",
+      "status": "documented",
+      "notes": "Use the platform skill root, then copy the liepin-cli folder into it."
+    },
+    {
+      "id": "cowork-generic",
+      "platform": "Cowork / Other Compatible Agents",
+      "install_root": "<platform-skill-root>",
+      "copy_from": "skills/liepin-cli",
+      "status": "generic",
+      "notes": "Any agent platform that supports a skills directory can reuse the same liepin-cli folder."
+    }
+  ]
+}

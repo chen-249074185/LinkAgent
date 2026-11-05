@@ -3,8 +3,10 @@ rag-mcp/target/
 crawl-mcp/target/
 liepin-mcp/target/
 
-# 第三方工具（vendored liepin-cli 官方 Python 工具 + venv，不入库）
-mcp/liepin-cli/
+# 第三方工具（vendored liepin-cli 源码入库，仅忽略虚拟环境/缓存）
+mcp/liepin-cli/.venv/
+mcp/liepin-cli/**/__pycache__/
+mcp/liepin-cli/**/*.egg-info/
 
 # 第三方工具（vendored anydoc 文档识别 CLI，npm 安装产物不入库）
 agent/anydoc/
@@ -17,6 +19,12 @@ agent/anydoc/
 
 # 运行时日志（logback FILE appender，管理端日志审计数据源）
 agent/logs/
+agent/sessions/
+
+# 本地运行时数据（rag.db/vec0.dll 由启动时生成或复制，不入库）
+agent/rag_data/rag.db
+agent/rag_data/rag.db-*
+agent/rag_data/vec0.dll
 # ������Կ��docker-compose ͬĿ¼ .env�����������
 
 

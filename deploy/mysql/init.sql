@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(128) UNIQUE,
     wechat_id VARCHAR(128) UNIQUE,
     persona VARCHAR(512),
+    total_tokens BIGINT NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -53,4 +54,21 @@ CREATE TABLE IF NOT EXISTS wechat_session (
     resume_json TEXT,
     saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     KEY idx_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 游记/足迹（TravelLogDao）
+CREATE TABLE IF NOT EXISTS travel_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL,
+    province VARCHAR(32) NOT NULL,
+    city VARCHAR(64),
+    location_name VARCHAR(128),
+    lng DOUBLE,
+    lat DOUBLE,
+    content TEXT,
+    img_list TEXT,
+    travel_date DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_user_time (user_id, created_at),
+    KEY idx_user_province (user_id, province)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

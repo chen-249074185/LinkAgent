@@ -1,0 +1,17 @@
+{
+  "title": "ApplyJobInputSchema",
+  "description": "应聘职位接口 /apply-job 入参。指定职位 id 和职位类型应聘职位。",
+  "type": "object",
+  "properties": {
+    "jobId": {
+      "type": "number",
+      "description": "职位id"
+    },
+    "jobKind": {
+      "type": "string",
+      "description": "职位类型编号",
+      "enum": ["1", "2"]
+    }
+  },
+  "required": ["jobId", "jobKind"]
+}

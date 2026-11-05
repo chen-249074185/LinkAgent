@@ -8,6 +8,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +29,9 @@ public class EmbeddingClient {
 
     private final String apiKey;
     private final String url;
-    private final HttpClient http = HttpClient.newHttpClient();
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(60);
+    private final HttpClient http = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build();
     private final ObjectMapper mapper = new ObjectMapper();
 
     public EmbeddingClient(String apiKey) {
@@ -91,6 +94,7 @@ public class EmbeddingClient {
                         .uri(URI.create(url))
                         .header("Authorization", "Bearer " + apiKey)
                         .header("Content-Type", "application/json")
+                        .timeout(READ_TIMEOUT)
                         .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)))
                         .build();
                 HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());

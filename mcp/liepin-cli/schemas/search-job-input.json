@@ -1,0 +1,48 @@
+{
+  "title": "SearchJobInputSchema",
+  "description": "搜索职位接口 /search-job 入参。根据工作经验要求、学历要求、公司性质（例如：国企、外企、民营）、工作地点、薪资上下限、薪资类型（「月薪」或「年薪」）、职位名称关键词、公司名称等参数获取匹配的职位列表。",
+  "type": "object",
+  "properties": {
+    "workExperience": {
+      "type": "string",
+      "description": "工作经验要求"
+    },
+    "eduLevel": {
+      "type": "string",
+      "description": "学历要求"
+    },
+    "compNature": {
+      "type": "string",
+      "description": "公司性质（例如：国企、外企、民营）"
+    },
+    "address": {
+      "type": "string",
+      "description": "工作地点"
+    },
+    "salaryFloor": {
+      "type": "string",
+      "description": "薪资下限"
+    },
+    "salaryCap": {
+      "type": "string",
+      "description": "薪资上限"
+    },
+    "salaryKind": {
+      "type": "string",
+      "description": "薪资类型（「月薪」或「年薪」）"
+    },
+    "jobName": {
+      "type": "string",
+      "description": "职位名称"
+    },
+    "companyName": {
+      "type": "string",
+      "description": "公司名称"
+    },
+    "page": {
+      "type": "number",
+      "description": "分页页码，约定：0 表示第 1 页；若不传，默认按 0 处理"
+    }
+  },
+  "required": []
+}

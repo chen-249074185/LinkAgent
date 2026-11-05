@@ -41,13 +41,14 @@ public class EphemeralMemory {
     }
 
     // 读回某用户的瞬时记忆（无则空列表）
+    // Redis 不可用时按"没有记忆"处理：记忆是增强能力，不能阻断对话
     public List<ChatEntry> load(String userId) {
-        String json = redis.opsForValue().get(RedisKeys.memory(userId));
-        if (json == null || json.isBlank()) return new ArrayList<>();
         try {
+            String json = redis.opsForValue().get(RedisKeys.memory(userId));
+            if (json == null || json.isBlank()) return new ArrayList<>();
             return objectMapper.readValue(json, new TypeReference<List<ChatEntry>>() {});
         } catch (Exception e) {
-            logger.warn("瞬时记忆读取失败(JSON损坏?)，清空重来: {}", e.getMessage());
+            logger.warn("瞬时记忆读取失败(Redis不可用或JSON损坏)，本次按无记忆处理: {}", e.getMessage());
             return new ArrayList<>();
         }
     }

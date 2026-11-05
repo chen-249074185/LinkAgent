@@ -48,7 +48,16 @@ class AdminAuthFilterTest {
                 .andExpect(jsonPath("$.data.status").value("ok"));
     }
 
-    // 过滤器只拦 /api/admin/*，用户路径不受影响（登录白名单照常）
+    // 采集/重建是管理员操作，未带管理端 Token 必须 401
+    @Test
+    void collectPath_requiresAdminToken() throws Exception {
+        mvc.perform(post("/api/collect")
+                        .param("userId", "u1").param("city", "北京").param("url", "http://x"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(401));
+    }
+
+    // 过滤器只拦管理轨路径，用户路径不受影响（登录白名单照常）
     @Test
     void nonAdminPath_notFiltered() throws Exception {
         mvc.perform(post("/api/user/login")

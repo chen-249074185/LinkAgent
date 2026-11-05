@@ -29,7 +29,9 @@ public class AdminAuthFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().startsWith("/api/admin/");
+        String uri = request.getRequestURI();
+        // 采集/重建属于管理员/初始化操作，和 /api/admin/** 一样走管理轨
+        return !(uri.startsWith("/api/admin/") || uri.equals("/api/collect") || uri.equals("/api/reindex"));
     }
 
     @Override

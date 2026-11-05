@@ -34,7 +34,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Bean
     public FilterRegistrationBean<AdminAuthFilter> adminAuthFilter(ObjectProvider<AppConfig> configProvider) {
         FilterRegistrationBean<AdminAuthFilter> reg = new FilterRegistrationBean<>(new AdminAuthFilter(configProvider));
-        reg.addUrlPatterns("/api/admin/*");
+        reg.addUrlPatterns("/api/admin/*", "/api/collect", "/api/reindex");
         return reg;
     }
 

@@ -1,12 +1,17 @@
 package com.star.agent.user;
 
-import com.star.agent.infra.web.Result;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 // 用户认证接口（登录/注册页前端调用，契约 10-25 冻结）：
-//   POST /api/user/send-code  {"email"}                          = 发验证码（60s 限流）
-//   POST /api/user/register   {"type":"username","username","password"} | {"type":"email","email","code"}
-//   POST /api/user/login      {"type":"username","username","password"} | {"type":"email","email","code"}
-//     成功 data = {token, userId}（邮箱路径未注册=自动注册，登录即注册）
-//  JWT 拦截器就绪后 userId 从 token 取，本接口签名不变
-public record AuthRequest(String type, String username, String password, String email, String code) {
+//   POST /api/user/register   {"type":"username",...} | {"type":"email",...}
+//   POST /api/user/login      {"type":"username",...} | {"type":"email",...}
+// 只校验“所有分支都必填”的 type；username/password/email/code 按 type 分支在 Service 里校验。
+public record AuthRequest(
+        @NotBlank(message = "不能为空") String type,
+        String username,
+        @Size(min = 6, max = 64, message = "长度需为 6~64") String password,
+        @Email(message = "格式不正确") String email,
+        @Size(min = 6, max = 6, message = "长度需为 6 位") String code) {
 }

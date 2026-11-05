@@ -1,18 +1,26 @@
 package com.star.agent.workflow;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.star.agent.skill.SkillContext;
 import com.star.agent.skill.SkillResult;
 import com.star.agent.skill.impl.CommuteSkill;
+import com.star.agent.skill.impl.mock.LiepinSkill;
+import com.star.agent.skill.impl.mock.RagSearchSkill;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.verify;
 
 // 租房决策主线编排测试：EXT 拦截 + 全链路跑通出报告
 // 显式锁 mock 模式：本测试测编排逻辑，不依赖真实 MCP（真实模式由 M3WorkflowAcceptanceTest 手动验收覆盖）
@@ -24,6 +32,12 @@ class RentDecisionWorkflowTest {
 
     @SpyBean
     private CommuteSkill commuteSkill;  // 包一层真技能、只替换 execute：避免测试真打高德 API
+
+    @SpyBean
+    private LiepinSkill liepinSkill;
+
+    @SpyBean
+    private RagSearchSkill ragSearchSkill;
 
     @Test
     void extSkill_get_weather_isBlocked() {
@@ -57,5 +71,23 @@ class RentDecisionWorkflowTest {
         assertTrue(report.contains("【四、风险检测】"));
         assertTrue(report.contains("【五、加权打分排行】"));
         assertTrue(report.indexOf("【一、片区就业分析】") < report.indexOf("【五、加权打分排行】"));
+    }
+
+    // 用户输入可能带引号/反斜杠：参数必须经 Jackson 转义，不能字符串拼接
+    @Test
+    void execute_escapesUserCityInJsonArgs() throws Exception {
+        doReturn(new SkillResult(true, "{}")).when(liepinSkill).execute(any());
+        doReturn(new SkillResult(true, "[]")).when(ragSearchSkill).execute(any());
+        doReturn(new SkillResult(true, "通勤40分钟")).when(commuteSkill).execute(any());
+
+        String city = "北京\"quote\\slash";
+        workflow.execute("u1", "t1", city, 6000);
+
+        ArgumentCaptor<SkillContext> captor = ArgumentCaptor.forClass(SkillContext.class);
+        verify(liepinSkill).execute(captor.capture());
+
+        JsonNode args = new ObjectMapper().readTree(captor.getValue().args());
+        assertEquals(city, args.path("city").asText());
+        assertEquals(city, args.path("address").asText());
     }
 }

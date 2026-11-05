@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "liepin-cli"
+version = "0.1.0"
+description = "CLI for Liepin resume and job APIs"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "typer>=0.12,<1.0",
+    "pydantic>=2.7,<3.0",
+    "requests>=2.32,<3.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0,<9.0"]
+
+[project.scripts]
+liepin-cli = "liepin_cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["liepin_cli*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

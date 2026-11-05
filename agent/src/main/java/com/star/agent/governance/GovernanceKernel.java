@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 // 治理内核：技能执行前的"保安"，过五道关才放行
 @Component
@@ -22,8 +23,8 @@ public class GovernanceKernel {
     private final ConfirmationStore confirmationStore; // 确认登记本
     private final RateLimiter rateLimiter;            // 单日限次记账本
     private final AdminSkillSwitch adminSkillSwitch;  // 管理端技能开关（可空：手动链路/旧测试无此组件）
-    private final Map<String, Integer> roundCount = new java.util.HashMap<>(); // 每轮工具计数
-    private final Map<String, String> pendingConfirmations = new java.util.HashMap<>(); // 待确认登记本 userId→工具名
+    private final Map<String, Integer> roundCount = new ConcurrentHashMap<>(); // 每轮工具计数（Tomcat 多线程并发）
+    private final Map<String, String> pendingConfirmations = new ConcurrentHashMap<>(); // 待确认登记本 userId→工具名
 
     public GovernanceKernel(SkillRegistry skillRegistry,
                             ConfirmationStore confirmationStore,
@@ -71,11 +72,11 @@ public class GovernanceKernel {
         }
 
         // 关4：一轮工具调用不超过 20 次
-        int count = roundCount.getOrDefault(userId, 0) + 1;
+        // merge 是原子操作：并发 check() 不会因为 get+put 丢失计数
+        int count = roundCount.merge(userId, 1, Integer::sum);
         if (count > 20) {
             return CheckResult.deny("本轮工具调用次数已达上限");
         }
-        roundCount.put(userId, count);
 
         // 关5：单日限次
         String dailyKey = userId + ":" + toolName;

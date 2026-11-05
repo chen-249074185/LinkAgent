@@ -19,6 +19,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 
 // 心知天气真实接入：get_weather 技能
@@ -28,10 +29,13 @@ import java.util.List;
 public class WeatherSkill implements Skill {
 
     private static final String DEFAULT_BASE_URL = "https://api.seniverse.com/v3/weather/";
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
 
     private final String baseUrl;   // host（末尾带 /），execute 按需拼 now.json / daily.json
     private final String apiKey;
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(REQUEST_TIMEOUT)
+            .build();
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Autowired
@@ -80,6 +84,7 @@ public class WeatherSkill implements Skill {
             }
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
+                    .timeout(REQUEST_TIMEOUT)
                     .GET()
                     .build();
             HttpResponse<String> resp = httpClient.send(request, HttpResponse.BodyHandlers.ofString());

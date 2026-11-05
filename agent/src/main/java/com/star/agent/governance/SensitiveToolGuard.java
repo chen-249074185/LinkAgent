@@ -13,7 +13,7 @@ public class SensitiveToolGuard {
 
     // 敏感工具 → 意图关键词（用户本轮消息含任一关键词才放行）
     private final Map<String, List<String>> intents = Map.of(
-            "mcp_liepin_resume", List.of("简历", "求职", "面试", "画像", "自我评价", "项目经历", "工作经历", "我的资料", "期望薪资")
+            "mcp_liepin_resume", List.of("简历", "求职", "画像", "自我评价", "项目经历", "工作经历", "我的资料", "期望薪资")
     );
 
     // 该工具是否敏感（需要意图确认）

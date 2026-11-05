@@ -9,6 +9,11 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -240,5 +245,44 @@ class GovernanceKernelTest {
         GovernanceKernel kernel = new GovernanceKernel(registry, store, limiter, skillSwitch);
 
         assertTrue(kernel.check("get_weather", "user1", "{}", "CHAT").allowed());
+    }
+
+    // 并发安检：100 个线程同时调用，本轮计数必须原子累加，只能放行 20 次
+    @Test
+    void concurrentChecks_neverExceedRoundLimit() throws Exception {
+        SkillRegistry registry = mock(SkillRegistry.class);
+        ConfirmationStore store = mock(ConfirmationStore.class);
+        RateLimiter limiter = mock(RateLimiter.class);
+        Skill skill = mockSkill(RiskLevel.LOW, "get_weather", List.of("CHAT"));
+        when(registry.getSkill("get_weather")).thenReturn(skill);
+        when(limiter.increment(anyString())).thenReturn(0);
+
+        GovernanceKernel kernel = newKernel(registry, store, limiter);
+        int threads = 100;
+        ExecutorService pool = Executors.newFixedThreadPool(16);
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(threads);
+        AtomicInteger allowed = new AtomicInteger();
+
+        for (int i = 0; i < threads; i++) {
+            pool.submit(() -> {
+                try {
+                    start.await();
+                    if (kernel.check("get_weather", "user1", "{}", "CHAT").allowed()) {
+                        allowed.incrementAndGet();
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    done.countDown();
+                }
+            });
+        }
+
+        start.countDown();
+        assertTrue(done.await(5, TimeUnit.SECONDS), "并发安检应在 5 秒内完成");
+        pool.shutdownNow();
+
+        assertEquals(20, allowed.get(), "并发下本轮工具调用只能放行 20 次");
     }
 }

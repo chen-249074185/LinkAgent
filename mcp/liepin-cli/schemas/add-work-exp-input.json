@@ -1,0 +1,80 @@
+{
+  "title": "AddWorkExpInputSchema",
+  "description": "新增工作经历接口 /add-work-exp 入参",
+  "type": "object",
+  "properties": {
+    "compName": {
+      "type": "string",
+      "description": "公司名称"
+    },
+    "industry": {
+      "type": "string",
+      "description": "所属行业名称"
+    },
+    "workStart": {
+      "type": "string",
+      "description": "在职开始时间，格式 YYYYMM"
+    },
+    "workEnd": {
+      "type": "string",
+      "description": "在职结束时间，格式 YYYYMM"
+    },
+    "rwTitle": {
+      "type": "string",
+      "description": "职位名称"
+    },
+    "jobtitle": {
+      "type": "string",
+      "description": "职位类别/职能名称"
+    },
+    "dq": {
+      "type": "string",
+      "description": "工作地点名称"
+    },
+    "dept": {
+      "type": "string",
+      "description": "所属部门"
+    },
+    "report": {
+      "type": "string",
+      "description": "汇报对象职位"
+    },
+    "subordinate": {
+      "type": "number",
+      "description": "下属人数"
+    },
+    "duty": {
+      "type": "string",
+      "description": "职责业绩"
+    },
+    "months": {
+      "type": "number",
+      "description": "薪资月数"
+    },
+    "salary": {
+      "type": "number",
+      "description": "薪资（元）"
+    },
+    "compkind": {
+      "type": "string",
+      "description": "公司性质编码"
+    },
+    "compscale": {
+      "type": "string",
+      "description": "公司规模编码"
+    },
+    "shieldComp": {
+      "type": "boolean",
+      "description": "是否对该公司屏蔽简历"
+    },
+    "labels": {
+      "type": "string",
+      "description": "拥有技能标签，英文逗号分隔"
+    },
+    "workType": {
+      "type": "number",
+      "description": "工作经历类型。允许取值及含义：1-全职，2-实习"
+    }
+  },
+  "required": ["compName", "rwTitle", "workStart", "workEnd"]
+}

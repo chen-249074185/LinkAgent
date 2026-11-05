@@ -7,7 +7,9 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -53,6 +55,33 @@ public class SQLiteVecStore implements VectorStore, KnowledgeBaseRepository {
             if (!columnExists("chunks", "filename")) {
                 st.execute("ALTER TABLE chunks ADD COLUMN filename TEXT");
                 st.execute("CREATE INDEX IF NOT EXISTS idx_chunks_file ON chunks (user_id, kb_id, filename)");
+            }
+            // 关键词检索：FTS5 外部内容表（unicode61 对空格分词的房源语料更友好），触发器保持与 chunks 同步
+            st.execute("CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(" +
+                    "content, content='chunks', content_rowid='id', tokenize='unicode61')");
+            st.execute("CREATE TRIGGER IF NOT EXISTS chunks_fts_ai AFTER INSERT ON chunks BEGIN " +
+                    "INSERT INTO chunks_fts(rowid, content) VALUES (new.id, new.content); END");
+            st.execute("CREATE TRIGGER IF NOT EXISTS chunks_fts_ad AFTER DELETE ON chunks BEGIN " +
+                    "INSERT INTO chunks_fts(chunks_fts, rowid, content) VALUES('delete', old.id, old.content); END");
+            st.execute("CREATE TRIGGER IF NOT EXISTS chunks_fts_au AFTER UPDATE ON chunks BEGIN " +
+                    "INSERT INTO chunks_fts(chunks_fts, rowid, content) VALUES('delete', old.id, old.content); " +
+                    "INSERT INTO chunks_fts(rowid, content) VALUES (new.id, new.content); END");
+            // 第二套索引：trigram 处理无空格中文/子串（如"杭州市西湖区"），与 unicode61 互补
+            st.execute("CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts_tri USING fts5(" +
+                    "content, content='chunks', content_rowid='id', tokenize='trigram')");
+            st.execute("CREATE TRIGGER IF NOT EXISTS chunks_fts_tri_ai AFTER INSERT ON chunks BEGIN " +
+                    "INSERT INTO chunks_fts_tri(rowid, content) VALUES (new.id, new.content); END");
+            st.execute("CREATE TRIGGER IF NOT EXISTS chunks_fts_tri_ad AFTER DELETE ON chunks BEGIN " +
+                    "INSERT INTO chunks_fts_tri(chunks_fts_tri, rowid, content) VALUES('delete', old.id, old.content); END");
+            st.execute("CREATE TRIGGER IF NOT EXISTS chunks_fts_tri_au AFTER UPDATE ON chunks BEGIN " +
+                    "INSERT INTO chunks_fts_tri(chunks_fts_tri, rowid, content) VALUES('delete', old.id, old.content); " +
+                    "INSERT INTO chunks_fts_tri(rowid, content) VALUES (new.id, new.content); END");
+            // 老库首次加 FTS 时补建索引
+            if (countRows("chunks_fts") == 0 && countRows("chunks") > 0) {
+                st.execute("INSERT INTO chunks_fts(chunks_fts) VALUES('rebuild')");
+            }
+            if (countRows("chunks_fts_tri") == 0 && countRows("chunks") > 0) {
+                st.execute("INSERT INTO chunks_fts_tri(chunks_fts_tri) VALUES('rebuild')");
             }
             // (09-29)：user 表 + knowledge_base 表，知识库归属显式化（R10）
             st.execute("CREATE TABLE IF NOT EXISTS users (" +
@@ -144,7 +173,26 @@ public class SQLiteVecStore implements VectorStore, KnowledgeBaseRepository {
     // 再截断回 topK（KNN 按距离升序返回，首次见到的内容即最低距离那条）
     @Override
     public synchronized List<SearchHit> search(String userId, String kbId, float[] queryEmbedding, int topK, double threshold) {
+        return search(userId, kbId, null, queryEmbedding, topK, threshold);
+    }
+
+    // 混合检索：向量候选 + FTS5 关键词候选，用 RRF 融合。
+    // queryText 为空时退化为纯向量，保持旧调用/测试行为不变。
+    @Override
+    public synchronized List<SearchHit> search(String userId, String kbId, String queryText,
+                                               float[] queryEmbedding, int topK, double threshold) {
         String owner = resolveOwner(userId, kbId);   // 共享库 → system 身份查（partition key 对齐）
+        List<SearchHit> vectorHits = vectorSearch(owner, kbId, queryEmbedding, topK, threshold);
+        if (queryText == null || queryText.isBlank()) {
+            return vectorHits;
+        }
+        List<SearchHit> keywordHits = keywordSearch(owner, kbId, queryText, topK);
+        return fuse(vectorHits, keywordHits, topK);
+    }
+
+    // KNN 向量检索（原逻辑）：阈值过滤 + 内容去重 + 截断 topK
+    private List<SearchHit> vectorSearch(String owner, String kbId, float[] queryEmbedding,
+                                         int topK, double threshold) {
         int fetchK = Math.min(Math.max(topK * 3, topK), 100);
         List<SearchHit> hits = new ArrayList<>();
         Set<String> seen = new HashSet<>();
@@ -171,8 +219,138 @@ public class SQLiteVecStore implements VectorStore, KnowledgeBaseRepository {
         } catch (Exception e) {
             throw new RuntimeException("检索失败: " + e.getMessage(), e);
         }
-        // 截断回 topK；去重后不足 topK 属正常（库里唯一内容就那么多）
         return hits.size() > topK ? hits.subList(0, topK) : hits;
+    }
+
+    // FTS5 关键词检索：unicode61（空格分词）+ trigram（无空格中文/子串）双索引，按排名融合
+    private List<SearchHit> keywordSearch(String owner, String kbId, String queryText, int topK) {
+        String ftsQuery = toFtsQuery(queryText);
+        if (ftsQuery == null) {
+            return List.of();
+        }
+        Map<String, Double> scores = new LinkedHashMap<>();
+        searchFts("chunks_fts", ftsQuery, owner, kbId, topK, scores);
+        if (scores.isEmpty()) {
+            // 空格分词没命中（如"杭州市西湖区"连写）→ 用 trigram 子串索引兜底；
+            // 只保留中文 token，避免预算数字（3000元）把无关城市带进来
+            String triQuery = toFtsTriQuery(queryText);
+            if (triQuery != null) {
+                searchFts("chunks_fts_tri", triQuery, owner, kbId, topK, scores);
+            }
+        }
+        return scores.entrySet().stream()
+                .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
+                .limit(topK)
+                .map(e -> new SearchHit(e.getKey(), 1.0 / (1.0 + e.getValue())))
+                .toList();
+    }
+
+    private void searchFts(String table, String ftsQuery, String owner, String kbId,
+                           int topK, Map<String, Double> scores) {
+        int fetchK = Math.min(Math.max(topK * 3, topK), 100);
+        try {
+            String sql = "SELECT c.content, bm25(" + table + ") AS rank " +
+                    "FROM " + table + " f JOIN chunks c ON c.id = f.rowid " +
+                    "WHERE " + table + " MATCH ? AND c.user_id = ? AND c.kb_id = ? " +
+                    "ORDER BY rank LIMIT ?";
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ps.setString(1, ftsQuery);
+            ps.setString(2, owner);
+            ps.setString(3, kbId);
+            ps.setInt(4, fetchK);
+            ResultSet rs = ps.executeQuery();
+            int rank = 0;
+            while (rs.next()) {
+                String content = rs.getString("content");
+                if (!scores.containsKey(content)) {   // 同一内容只保留最好名次，避免重复行抬高分数
+                    scores.put(content, 1.0 / (60 + rank + 1));
+                }
+                rank++;
+            }
+            rs.close();
+            ps.close();
+        } catch (Exception ignored) {
+            // 单个索引失败不影响另一个索引和向量检索
+        }
+    }
+
+    // RRF 重排：以向量候选为召回集，关键词只做加分，不额外引入候选。
+    // 这样既保留向量召回率，又避免关键词把无关城市的房源带进来。
+    private List<SearchHit> fuse(List<SearchHit> vectorHits, List<SearchHit> keywordHits, int topK) {
+        if (vectorHits.isEmpty()) {
+            return keywordHits.size() > topK ? keywordHits.subList(0, topK) : keywordHits;
+        }
+        Map<String, Integer> keywordRank = new LinkedHashMap<>();
+        for (int i = 0; i < keywordHits.size(); i++) {
+            keywordRank.putIfAbsent(keywordHits.get(i).content(), i);
+        }
+        Map<String, Double> rrf = new LinkedHashMap<>();
+        for (int i = 0; i < vectorHits.size(); i++) {
+            String content = vectorHits.get(i).content();
+            double score = 1.0 / (60 + i + 1);
+            Integer kr = keywordRank.get(content);
+            if (kr != null) {
+                score += 1.0 / (60 + kr + 1);
+            }
+            rrf.put(content, score);
+        }
+        return rrf.entrySet().stream()
+                .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
+                .limit(topK)
+                .map(e -> new SearchHit(e.getKey(), 1.0 / (1.0 + e.getValue())))
+                .toList();
+    }
+
+    // 用户查询 → FTS5 MATCH 表达式：按标点/空白切词，3 字以上做 OR 短语
+    private String toFtsTriQuery(String text) {
+        if (text == null) {
+            return null;
+        }
+        java.util.LinkedHashSet<String> grams = new java.util.LinkedHashSet<>();
+        for (String token : text.replaceAll("[\\p{P}\\s]+", " ").trim().split("\\s+")) {
+            if (token.length() < 3 || token.contains("元") || !token.matches(".*[\\u4e00-\\u9fff].*")) {
+                continue;
+            }
+            // trigram 索引按 3 字窗口匹配；整词做 phrase 会因空格断开，拆成 n-gram OR 更稳
+            for (int i = 0; i + 3 <= token.length() && grams.size() < 20; i++) {
+                grams.add(token.substring(i, i + 3));
+            }
+        }
+        if (grams.isEmpty()) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String gram : grams) {
+            if (sb.length() > 0) {
+                sb.append(" OR ");
+            }
+            sb.append('"').append(gram).append('"');
+        }
+        return sb.toString();
+    }
+
+    private String toFtsQuery(String text) {
+        if (text == null) {
+            return null;
+        }
+        String normalized = text.replaceAll("[\\p{P}\\s]+", " ").trim();
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String token : normalized.split("\\s+")) {
+            if (token.length() < 3) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(" OR ");
+            }
+            sb.append('"').append(token.replace("\"", "\"\"")).append('"');
+        }
+        if (sb.length() == 0 && normalized.length() >= 3) {
+            sb.append('"').append(normalized.replace("\"", "\"\"")).append('"');
+        }
+        return sb.length() == 0 ? null : sb.toString();
     }
 
     @Override
@@ -451,6 +629,14 @@ public class SQLiteVecStore implements VectorStore, KnowledgeBaseRepository {
             sb.append(arr[i]);
         }
         return sb.append("]").toString();
+    }
+
+    // 表行数（FTS 首次建索引判断用）
+    private long countRows(String table) throws Exception {
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM " + table)) {
+            return rs.next() ? rs.getLong(1) : 0;
+        }
     }
 
     // 表里是否已有某列（老库升级幂等用：CREATE TABLE IF NOT EXISTS 不会给已有表加列）

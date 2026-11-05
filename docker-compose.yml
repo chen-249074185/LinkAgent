@@ -39,6 +39,9 @@ services:
     command: >
       if [ ! -f /cli/.venv/bin/python ]; then
         cp -r /src/liepin-cli/. /cli/ &&
+        rm -rf /cli/.venv &&
+        find /cli -name '__pycache__' -type d -prune -exec rm -rf {} + &&
+        find /cli -name '*.egg-info' -type d -prune -exec rm -rf {} + &&
         python3 -m venv /cli/.venv &&
         /cli/.venv/bin/pip install --no-cache-dir -e /cli
       fi &&
@@ -95,6 +98,12 @@ services:
       LUCKIN_MCP_TOKEN: ${LUCKIN_MCP_TOKEN:-}
       LIEPIN_USER_TOKEN: ${LIEPIN_USER_TOKEN:-}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
 
 volumes:
   mysql-data:

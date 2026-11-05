@@ -5,6 +5,7 @@ import com.star.agent.infra.web.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -43,13 +44,13 @@ public class AuthController {
 
     @Operation(summary = "注册", description = "type=username（用户名+密码）或 type=email（邮箱+验证码）")
     @PostMapping("/register")
-    public Result<AuthResult> register(@RequestBody AuthRequest req) {
+    public Result<AuthResult> register(@Valid @RequestBody AuthRequest req) {
         return Result.ok(authService.register(req.type(), req.username(), req.password(), req.email(), req.code()));
     }
 
     @Operation(summary = "登录", description = "返回 {token, userId}；邮箱路径未注册=自动注册（登录即注册）")
     @PostMapping("/login")
-    public Result<AuthResult> login(@RequestBody AuthRequest req) {
+    public Result<AuthResult> login(@Valid @RequestBody AuthRequest req) {
         return Result.ok(authService.login(req.type(), req.username(), req.password(), req.email(), req.code()));
     }
 

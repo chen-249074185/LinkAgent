@@ -83,11 +83,11 @@ class JwtAuthInterceptorTest {
                 .andExpect(status().isOk());
     }
 
-    // 白名单：内部采集工具免登录
+    // 采集/重建不走用户 JWT，但走管理端 Token：无 Token 应 401（不是 200）
     @Test
-    void whitelist_collect_noToken() throws Exception {
+    void collectPath_notCoveredByJwt_butRequiresAdminToken() throws Exception {
         mvc.perform(post("/api/collect").param("userId", "u1").param("city", "北京").param("url", "http://x"))
-                .andExpect(status().isOk());
+                .andExpect(status().isUnauthorized());
     }
 
     // 管理端路径由 AdminAuthFilter 管，JWT 拦截器不掺和（无 token 应被管理轨 401，而不是用户轨 401 抢先）

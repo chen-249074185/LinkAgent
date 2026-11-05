@@ -10,6 +10,7 @@ import com.star.agent.llm.LlmClient;
 import com.star.agent.llm.ToolCall;
 import com.star.agent.llm.ToolSpec;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -21,6 +22,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +40,8 @@ public class DeepSeekLlmClient implements LlmClient {
 
     // 官方接口地址。做成常量，缺省用；测试想打假服务器就换地址
     private static final String DEFAULT_BASE_URL = "https://api.deepseek.com";
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(120);
 
     // 官方当前模型 ID：deepseek-chat 别名 2026-07-24 已退役，换 v4-flash（输入 ¥1.5~3 / 输出 ¥4.5~9 每百万 token）
     public static final String MODEL_NAME = "deepseek-v4-flash";
@@ -55,7 +59,9 @@ public class DeepSeekLlmClient implements LlmClient {
 
     // 流式客户端：JDK 自带的 java.net.http.HttpClient（零新依赖）
     // ofInputStream() 能拿到"活的输入流"，模型生成一段、我们读一段，不用等全部完成
-    private final HttpClient streamClient = HttpClient.newHttpClient();
+    private final HttpClient streamClient = HttpClient.newBuilder()
+            .connectTimeout(CONNECT_TIMEOUT)
+            .build();
 
     // ObjectMapper = Jackson 的 JSON 读写器。
     // 非流式 RestClient 会自动把 body 序列化；流式要手动发请求，得自己把 body 变成 JSON 字符串
@@ -75,7 +81,11 @@ public class DeepSeekLlmClient implements LlmClient {
     public DeepSeekLlmClient(String baseUrl, AppConfig appConfig) {
         this.baseUrl = baseUrl;
         this.apiKey = appConfig.deepseekApiKey();   // 从环境变量读 DEEPSEEK_API_KEY
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout((int) CONNECT_TIMEOUT.toMillis());
+        requestFactory.setReadTimeout((int) READ_TIMEOUT.toMillis());
         this.client = RestClient.builder()
+                .requestFactory(requestFactory)
                 .baseUrl(baseUrl)
                 .defaultHeader("Authorization", "Bearer " + apiKey)   // 每次请求自动带上鉴权头
                 .defaultHeader("Content-Type", "application/json")
@@ -104,7 +114,11 @@ public class DeepSeekLlmClient implements LlmClient {
                 .body(JsonNode.class);
 
         // 3. 从响应里挖数据：choices[0].message 里有 content 和 tool_calls
-        JsonNode message = resp.path("choices").get(0).path("message");
+        JsonNode choices = resp.path("choices");
+        if (!choices.isArray() || choices.isEmpty()) {
+            throw new IllegalStateException("DeepSeek 返回异常: " + resp);
+        }
+        JsonNode message = choices.get(0).path("message");
         return new ChatResponse(
                 message.path("content").asText(),       // 模型回复的正文（没有就是 ""）
                 parseToolCalls(message.path("tool_calls")) // 模型要求调的工具清单（没有就是空列表）
@@ -134,6 +148,7 @@ public class DeepSeekLlmClient implements LlmClient {
                 .uri(URI.create(baseUrl + "/chat/completions"))
                 .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
+                .timeout(READ_TIMEOUT)
                 .POST(HttpRequest.BodyPublishers.ofString(toJson(body)))
                 .build();
 
@@ -141,6 +156,11 @@ public class DeepSeekLlmClient implements LlmClient {
         Map<Integer, ToolCallAcc> acc = new java.util.TreeMap<>();   // 按 index 排序拼接订单碎片
         try {
             HttpResponse<InputStream> resp = streamClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            if (resp.statusCode() != 200) {
+                String err = new String(resp.body().readAllBytes(), StandardCharsets.UTF_8);
+                throw new IllegalStateException("DeepSeek HTTP " + resp.statusCode() + ": "
+                        + (err.length() > 300 ? err.substring(0, 300) : err));
+            }
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(resp.body(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = reader.readLine()) != null) {

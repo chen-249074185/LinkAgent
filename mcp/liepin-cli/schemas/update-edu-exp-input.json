@@ -1,0 +1,40 @@
+{
+  "title": "UpdateEduExpInputSchema",
+  "description": "更新教育经历接口 /update-edu-exp 入参",
+  "type": "object",
+  "properties": {
+    "eduId": {
+      "type": "number",
+      "description": "教育经历 ID"
+    },
+    "school": {
+      "type": "string",
+      "description": "学校名称"
+    },
+    "major": {
+      "type": "string",
+      "description": "专业名称，高中及以下可不填"
+    },
+    "start": {
+      "type": "string",
+      "description": "开始时间，格式 YYYYMM"
+    },
+    "end": {
+      "type": "string",
+      "description": "结束时间，格式 YYYYMM"
+    },
+    "degree": {
+      "type": "string",
+      "description": "学历。允许取值及含义：090-初中及以下，080-高中，060-中专/中技，050-大专，040-本科，030-硕士，020-MBA/EMBA，010-博士"
+    },
+    "tz": {
+      "type": "string",
+      "description": "统招标志。允许取值及含义：0-否，1-是"
+    },
+    "experience": {
+      "type": "string",
+      "description": "在校经历"
+    }
+  },
+  "required": ["eduId"]
+}

@@ -207,7 +207,7 @@ McpServer.sync(transport)
                     String query = String.valueOf(args.get("query"));
                     int topK = args.getOrDefault("top_k", 5) instanceof Number n ? n.intValue() : 5;
                     float[] vec = embedding.embed(query);
-                    List<VectorStore.SearchHit> hits = store.search(userId, kbId, vec, topK, 1.5);
+                    List<VectorStore.SearchHit> hits = store.search(userId, kbId, query, vec, topK, 1.5);
                     StringBuilder sb = new StringBuilder();
                     for (VectorStore.SearchHit h : hits) {
                         sb.append("[score=").append(String.format("%.3f", h.score())).append("] ")

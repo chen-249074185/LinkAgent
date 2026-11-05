@@ -1,5 +1,8 @@
 package com.star.agent.workflow;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.star.agent.skill.Skill;
 import com.star.agent.skill.SkillRegistry;
 import com.star.agent.skill.SkillResult;
@@ -11,7 +14,7 @@ import com.star.agent.workflow.node.SkillNode;
 import com.star.agent.workflow.node.WorkflowNode;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -25,6 +28,8 @@ public class RentDecisionWorkflow {
             "rag_search", "mcp_rag_search",
             "liepin_jobs", "mcp_liepin_search_jobs"
     );
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     // 共享房源库（11-03 方案1）：房源=通用公开数据（爬链家），全用户只读可检索。
     // 真实模式 rag_search 固定检索共享库，不再依赖用户自己传房源；岗位仍走用户私有库
@@ -67,29 +72,61 @@ public class RentDecisionWorkflow {
 
         List<WorkflowNode> nodes = List.of(
             // 工序1：猎聘片区就业分析（参数双兼容：Mock 读 city；真实 MCP 读 keyword/address）
-            new SkillNode("jobs", skill("liepin_jobs"),
-                    "{\"city\":\"" + city + "\",\"keyword\":\"Java开发\",\"address\":\"" + city + "\"}"),
+            new SkillNode("jobs", skill("liepin_jobs"), jobsArgs(city)),
             // 工序2：RAG 房源检索（参数双兼容：Mock 读 city/maxPrice；真实 MCP 读 query 做语义检索）
             // kb_id 固定共享房源库（只读全局库，房源=公开数据；McpSkill 白名单放行此值）
-            new SkillNode("houses", skill("rag_search"),
-                    "{\"city\":\"" + city + "\",\"maxPrice\":" + maxPrice
-                            + ",\"query\":\"" + city + " 预算" + maxPrice + "元以内 房源 租房\""
-                            + ",\"kb_id\":\"" + SHARED_HOUSES_KB + "\"}"),
+            new SkillNode("houses", skill("rag_search"), housesArgs(city, maxPrice)),
             // 工序3：通勤测算（目的地=目标城市；出发地缺省 → CommuteSkill 返回"请提供出发地"，
             // 报告通勤段诚实提示用户提供位置/上班地点后即可测算，不编造坐标）
-            new SkillNode("commutes", skill("commute_estimate"),
-                    "{\"destination\":\"" + city + "\"}"),
+            new SkillNode("commutes", skill("commute_estimate"), json(Map.of("destination", city))),
             // 工序4：风险检测（动态参数：真实 RAG 自由文本 → HouseTextParser 结构化房源 JSON）
-            new SkillNode("risks", skill("rent_risk"),
-                    ctx2 -> "{\"houses\":" + HouseTextParser.toJson(((SkillResult) ctx2.get("houses")).content()) + "}"),
+            new SkillNode("risks", skill("rent_risk"), RentDecisionWorkflow::housesJson),
             // 工序5：加权打分（同上，双模式兼容：Mock JSON 透传 / 真实文本解析）
-            new SkillNode("scores", skill("house_score"),
-                    ctx2 -> "{\"houses\":" + HouseTextParser.toJson(((SkillResult) ctx2.get("houses")).content()) + "}"),
+            new SkillNode("scores", skill("house_score"), RentDecisionWorkflow::housesJson),
             // 工序6：汇总报告
             new ReportNode("report")
         );
 
         engine.execute(nodes, ctx);          // 传送带开跑
         return (String) ctx.get("report");   // 从背包取最终报告
+    }
+
+    // 参数一律走 Jackson：用户输入的 city 可能带引号/反斜杠，字符串拼接会生成非法 JSON
+    private static String json(Object value) {
+        try {
+            return JSON.writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("工作流参数序列化失败", e);
+        }
+    }
+
+    private static String jobsArgs(String city) {
+        Map<String, Object> args = new LinkedHashMap<>();
+        args.put("city", city);
+        args.put("keyword", "Java开发");
+        args.put("address", city);
+        return json(args);
+    }
+
+    private static String housesArgs(String city, int maxPrice) {
+        Map<String, Object> args = new LinkedHashMap<>();
+        args.put("city", city);
+        args.put("maxPrice", maxPrice);
+        args.put("query", city + " 预算" + maxPrice + "元以内 房源 租房");
+        args.put("kb_id", SHARED_HOUSES_KB);
+        return json(args);
+    }
+
+    // 上一节点房源结果（可能是 Mock JSON，也可能是真实 RAG 自由文本）→ {"houses":[...]}
+    private static String housesJson(WorkflowContext ctx) {
+        Object value = ctx.get("houses");
+        String raw = value instanceof SkillResult result ? result.content() : "[]";
+        try {
+            Map<String, Object> args = new LinkedHashMap<>();
+            args.put("houses", JSON.readTree(HouseTextParser.toJson(raw)));
+            return JSON.writeValueAsString(args);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("房源参数序列化失败", e);
+        }
     }
 }

@@ -1,0 +1,12 @@
+{
+  "title": "UpdateSelfAssessInputSchema",
+  "description": "更新自我评价接口 /update-self-assess 入参",
+  "type": "object",
+  "properties": {
+    "selfAssess": {
+      "type": "string",
+      "description": "自我评价内容"
+    }
+  },
+  "required": ["selfAssess"]
+}

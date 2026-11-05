@@ -16,6 +16,12 @@ public interface VectorStore {
     // 找最相近的 topK 个切片（只搜该用户的私有库，隔离校验在调用方做）
     List<SearchHit> search(String userId, String kbId, float[] queryEmbedding, int topK, double threshold);
 
+    // 混合检索：向量 + 关键词（FTS5）RRF 融合。默认退化为纯向量，旧实现无需改动。
+    default List<SearchHit> search(String userId, String kbId, String queryText,
+                                   float[] queryEmbedding, int topK, double threshold) {
+        return search(userId, kbId, queryEmbedding, topK, threshold);
+    }
+
     // 列出库内文件（按 filename 分组：块数 + 最后入库时间），分文件删除的列表依据
     List<FileInfo> listFiles(String userId, String kbId);
 

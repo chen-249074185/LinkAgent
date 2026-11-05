@@ -5,7 +5,8 @@
 # ---------- 构建阶段 ----------
 FROM maven:3.9.9-eclipse-temurin-21 AS build
 WORKDIR /build
-# 先 COPY pom 拉依赖缓存（改动少时复用镜像层），再 COPY 源码
+# 先 COPY 聚合 POM + 各模块 POM 拉依赖缓存（改动少时复用镜像层），再 COPY 源码
+COPY pom.xml pom.xml
 COPY agent/pom.xml agent/pom.xml
 COPY rag-mcp/pom.xml rag-mcp/pom.xml
 COPY crawl-mcp/pom.xml crawl-mcp/pom.xml

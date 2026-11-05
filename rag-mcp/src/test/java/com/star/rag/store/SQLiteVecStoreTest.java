@@ -1,5 +1,6 @@
 package com.star.rag.store;
 
+import com.star.rag.TestVecDll;
 import com.star.rag.security.KnowledgeBaseGuard;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SQLiteVecStoreTest {
 
     // 指向 spike 里已下载的 vec0.dll
-    private static final String VEC_DLL = "spike/sqlite-vec/vec0.dll";
+    private static final String VEC_DLL = TestVecDll.path();
 
     private SQLiteVecStore store;
 
@@ -368,5 +369,26 @@ class SQLiteVecStoreTest {
         // 越权隔离仍生效：u2 搜 u1 的库被拒
         String denied = new KnowledgeBaseGuard(store).checkAccess("u2", "u1-default");
         org.junit.jupiter.api.Assertions.assertNotNull(denied, "迁移后 u2 仍无权访问 u1 的库");
+    }
+
+    // 混合检索：向量偏向北京，但关键词命中杭州 → RRF 后杭州应排第一
+    @Test
+    void hybridSearch_keywordCanOutrankVector() {
+        store.insertChunk("u1", "kb1", "杭州 西湖区 两室一厅 租金3000元", "杭州.txt", axis(0), "{}");
+        store.insertChunk("u1", "kb1", "北京 朝阳区 一室 租金5000元", "北京.txt", axis(1), "{}");
+
+        List<VectorStore.SearchHit> pure = store.search("u1", "kb1", axis(1), 1, 1.5);
+        assertTrue(pure.get(0).content().contains("北京"), "纯向量应偏向北京");
+
+        List<VectorStore.SearchHit> hybrid = store.search("u1", "kb1", "杭州市西湖区 3000", axis(1), 2, 1.5);
+        assertTrue(hybrid.get(0).content().contains("杭州"), "关键词命中后杭州应排第一");
+    }
+
+    // FTS 触发器：删库后关键词检索不应再返回旧内容
+    @Test
+    void hybridSearch_deleteByKb_removesFtsRows() {
+        store.insertChunk("u1", "kb1", "杭州 西湖区 两室一厅 租金3000元", "杭州.txt", axis(0), "{}");
+        store.deleteByKb("u1", "kb1");
+        assertTrue(store.search("u1", "kb1", "杭州市西湖区", axis(0), 5, 1.5).isEmpty());
     }
 }

@@ -8,6 +8,7 @@ import com.star.agent.llm.ChatResponse;
 import com.star.agent.llm.LlmClient;
 import com.star.agent.llm.ToolSpec;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -19,6 +20,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -35,12 +37,16 @@ public class DashScopeLlmClient implements LlmClient {
 
     // 意图分类默认用的轻量模型
     private static final String DEFAULT_MODEL = "qwen-turbo";
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(120);
 
     private final String baseUrl;
     private final String apiKey;
     private final String model;
     private final RestClient client;
-    private final HttpClient streamClient = HttpClient.newHttpClient();
+    private final HttpClient streamClient = HttpClient.newBuilder()
+            .connectTimeout(CONNECT_TIMEOUT)
+            .build();
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Autowired
@@ -53,7 +59,11 @@ public class DashScopeLlmClient implements LlmClient {
         this.baseUrl = baseUrl;
         this.model = model;
         this.apiKey = appConfig.dashScopeApiKey();
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout((int) CONNECT_TIMEOUT.toMillis());
+        requestFactory.setReadTimeout((int) READ_TIMEOUT.toMillis());
         this.client = RestClient.builder()
+                .requestFactory(requestFactory)
                 .baseUrl(baseUrl)
                 .defaultHeader("Authorization", "Bearer " + apiKey)
                 .defaultHeader("Content-Type", "application/json")
@@ -84,7 +94,11 @@ public class DashScopeLlmClient implements LlmClient {
                 .retrieve()
                 .body(JsonNode.class);
 
-        JsonNode message = resp.path("choices").get(0).path("message");
+        JsonNode choices = resp.path("choices");
+        if (!choices.isArray() || choices.isEmpty()) {
+            throw new IllegalStateException("DashScope 返回异常: " + resp);
+        }
+        JsonNode message = choices.get(0).path("message");
         return new ChatResponse(
                 message.path("content").asText(),
                 new ArrayList<>()   // 分类/对话不调工具，toolCalls 恒为空
@@ -103,11 +117,17 @@ public class DashScopeLlmClient implements LlmClient {
                 .uri(URI.create(baseUrl + "/chat/completions"))
                 .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
+                .timeout(READ_TIMEOUT)
                 .POST(HttpRequest.BodyPublishers.ofString(toJson(body)))
                 .build();
 
         try {
             HttpResponse<InputStream> resp = streamClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            if (resp.statusCode() != 200) {
+                String err = new String(resp.body().readAllBytes(), StandardCharsets.UTF_8);
+                throw new IllegalStateException("DashScope HTTP " + resp.statusCode() + ": "
+                        + (err.length() > 300 ? err.substring(0, 300) : err));
+            }
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(resp.body(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = reader.readLine()) != null) {

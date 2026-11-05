@@ -66,7 +66,7 @@
 | DELETE | /api/config/liepin-token | userId | 删除 |
 | GET | /api/config/liepin-token | userId | 状态（configured + updatedAt，不返回明文） |
 
-## 五、房源采集 `/api`（已有，内部工具）
+## 五、房源采集 `/api`（鉴权：X-Admin-Token，管理员/初始化用）
 
 | 方法 | 路径 | 入参 | 说明 |
 |---|---|---|---|

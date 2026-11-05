@@ -18,8 +18,10 @@ sessions/
 **/vec0.dll
 **/vec0.so
 rag_data/rag.db
-# 第三方 venv/节点产物
+# 第三方 venv/缓存/节点产物
 mcp/liepin-cli/.venv/
+mcp/liepin-cli/**/__pycache__/
+mcp/liepin-cli/**/*.egg-info/
 mcp/liepin-cli/node_modules/
 **/node_modules/
 # 文档/示例

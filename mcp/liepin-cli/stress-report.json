@@ -1,0 +1,25 @@
+{
+  "http": {
+    "p50_ms": 772.6133960004518,
+    "p95_ms": 1004.1280016021119,
+    "p99_ms": 1010.0759104985991,
+    "success_count": 30,
+    "error_count": 0,
+    "wall_clock_ms": 2599.77
+  },
+  "cli": {
+    "p50_ms": 3071.2753959996917,
+    "p95_ms": 3568.4228793494185,
+    "p99_ms": 3615.461570039988,
+    "success_count": 30,
+    "error_count": 0,
+    "wall_clock_ms": 9651.919
+  },
+  "meta": {
+    "base_url_host": "open-agent.liepin.com",
+    "total_planned": 30,
+    "concurrency": 10,
+    "timestamp_utc": "2026-04-06T04:43:15Z",
+    "mode": "both"
+  }
+}

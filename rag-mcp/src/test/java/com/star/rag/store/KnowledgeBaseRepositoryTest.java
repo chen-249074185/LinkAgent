@@ -1,5 +1,6 @@
 package com.star.rag.store;
 
+import com.star.rag.TestVecDll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 // KnowledgeBaseRepository 集成测试：自动默认库/建库/列表/删库/显式归属隔离
 class KnowledgeBaseRepositoryTest {
 
-    private static final String VEC_DLL = "spike/sqlite-vec/vec0.dll";
+    private static final String VEC_DLL = TestVecDll.path();
 
     private SQLiteVecStore store;
 

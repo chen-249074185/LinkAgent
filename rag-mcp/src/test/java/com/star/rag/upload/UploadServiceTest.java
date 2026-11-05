@@ -2,6 +2,7 @@ package com.star.rag.upload;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.star.rag.TestVecDll;
 import com.star.rag.document.ContentCleaner;
 import com.star.rag.document.DocumentParser;
 import com.star.rag.document.TextChunker;
@@ -28,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class UploadServiceTest {
 
     // 指向 spike 里已下载的 vec0.dll（与 SQLiteVecStoreTest 一致）
-    private static final String VEC_DLL = "spike/sqlite-vec/vec0.dll";
+    private static final String VEC_DLL = TestVecDll.path();
 
     private final ObjectMapper mapper = new ObjectMapper();
 
