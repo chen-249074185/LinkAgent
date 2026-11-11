@@ -43,6 +43,8 @@ public class AppConfig {
 
     private final String jwtSecret = firstOf("JWT_SECRET");          // JWT 签名密钥（HS256 ≥32 字节）
 
+    private final String fieldEncryptionKey = firstOf("FIELD_ENCRYPTION_KEY"); // 敏感字段落库加密密钥（缺省回退 JWT_SECRET）
+
     // 构造自检：各 key 是否就位 + 脱敏指纹（后4位，对比 .env/环境变量是否同 key；纯 main 扫码链路也走这个构造器）
     public AppConfig() {
         logger.info("配置自检: DEEPSEEK={} SENIVERSE={} AMAP={} AMAP指纹={} AMAP_JS={} (长度, 0=缺失, 来源={})",
@@ -111,5 +113,7 @@ public class AppConfig {
     public String mailAuthCode(){ return mailAuthCode; }
 
     public String jwtSecret(){ return jwtSecret; }
+
+    public String fieldEncryptionKey(){ return fieldEncryptionKey; }
 
 }

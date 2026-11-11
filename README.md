@@ -141,7 +141,7 @@ sequenceDiagram
 - **CI**：GitHub Actions 起 MySQL + Redis 服务，跑测试、打包四模块、构建 Docker 镜像。
 - **可观测性**：`/actuator/health`、`/actuator/metrics`、`/actuator/prometheus`；请求级 `traceId` 写入日志和响应头。
 - **故障降级**：Redis 不可用时，限流 / 确认态 / 瞬时记忆自动退回内存；MCP 不可用时接口返回明确错误，不拖垮主链路。
-- **安全**：JWT 鉴权、BCrypt 密码、管理端 Token、高危操作确认、技能白名单、密钥全部走环境变量。
+- **安全**：JWT 鉴权、BCrypt 密码、管理端 Token、高危操作确认、技能白名单、密钥全部走环境变量；猎聘 Token / 微信 botToken / 会话恢复上下文用 **AES-256-GCM 加密后入库**（`enc:v1:` 前缀，带字段级 AAD，防篡改与跨字段搬运）。
 
 ---
 
@@ -194,6 +194,7 @@ Mock 模式用 4 个占位技能跑通工作流，适合看编排逻辑；真实
 | `SENIVERSE_API_KEY` | 天气 |
 | `MYSQL_PASSWORD` | MySQL |
 | `JWT_SECRET` | JWT 签名（HS256 ≥ 32 字节） |
+| `FIELD_ENCRYPTION_KEY` | 敏感字段落库加密（AES-256-GCM）；留空回退 JWT_SECRET 派生 |
 | `ADMIN_TOKEN_WEB` | 管理端 |
 | `LIEPIN_USER_TOKEN` | 猎聘（可选） |
 | `LUCKIN_MCP_TOKEN` | 瑞幸 MCP（可选） |
@@ -217,6 +218,7 @@ mvn -DskipTests package
 ## 已知限制
 
 - **单机设计**：SQLite 单写、图片存本地、治理计数在 JVM 内存；多实例部署需要迁移到 pgvector / 对象存储 / Redis 状态。
+- **文件版会话仍是明文**：`sessions/*.session`（仅供手动 main 扫码链路）没有走 FieldCipher，因为没有 Spring 容器；Spring 链路已全部加密。
 - **检索是单连接**：混合检索已实现，但 SQLite 读路径串行化；8 并发下 p95 会明显升高，见性能文档。
 - **通勤需要出发地**：工作流只带目的地，缺出发地时报告会提示用户补充。
 - **爬虫合规**：链家 / 猎聘采集仅用于学习与个人求职，请遵守目标站点条款并控制频率。

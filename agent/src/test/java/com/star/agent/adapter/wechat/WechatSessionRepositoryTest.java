@@ -4,6 +4,9 @@ import com.github.wechat.ilink.sdk.core.context.ConversationContext;
 import com.github.wechat.ilink.sdk.core.context.ContextKey;
 import com.github.wechat.ilink.sdk.core.context.ResumeContext;
 import com.github.wechat.ilink.sdk.core.login.LoginContext;
+import com.star.agent.adapter.wechat.dao.WechatSessionDao;
+import com.star.agent.adapter.wechat.domain.WechatSessionDo;
+import com.star.agent.infra.crypto.FieldCipher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +29,9 @@ class WechatSessionRepositoryTest {
 
     @Autowired
     WechatSessionRepository repository;
+
+    @Autowired
+    WechatSessionDao mapper;
 
     @AfterEach
     void tearDown() {
@@ -133,5 +139,36 @@ class WechatSessionRepositoryTest {
         assertEquals(1, deleted, "只应删掉 8 天前的旧会话");
         assertNotNull(repository.load("repo-bot-aaa"), "新会话不应被删");
         assertNull(repository.load("repo-bot-bbb"), "旧会话应被清理");
+    }
+
+    // 落库加密：bot_token 和 resume_json 都是凭据，库里只能是密文
+    @Test
+    void savedSession_isEncryptedAtRest() {
+        repository.save(fullContext("repo-bot-aaa"));
+
+        WechatSessionDo row = mapper.findByBotId("repo-bot-aaa");
+
+        assertTrue(row.getBotToken().startsWith(FieldCipher.PREFIX), "bot_token 必须加密入库");
+        assertTrue(row.getResumeJson().startsWith(FieldCipher.PREFIX), "resume_json 必须加密入库");
+        assertFalse(row.getResumeJson().contains("cursor-abc"), "库里不能出现明文游标");
+        assertFalse(row.getResumeJson().contains("token-1"), "库里不能出现明文 botToken");
+        // 读出来仍能还原（加密对调用方透明）
+        assertEquals("cursor-abc", repository.load("repo-bot-aaa").getUpdatesCursor());
+    }
+
+    // 历史明文兼容：升级前的明文行，读的时候照样能恢复
+    @Test
+    void legacyPlaintextSession_stillLoads() throws Exception {
+        WechatSessionDo legacy = new WechatSessionDo();
+        legacy.setBotId("repo-bot-ccc");
+        legacy.setUserId("user-legacy");
+        legacy.setBotToken("plain-token");
+        legacy.setResumeJson(SessionStore.toJson(fullContext("repo-bot-ccc")));
+        mapper.upsert(legacy);
+
+        ResumeContext ctx = repository.load("repo-bot-ccc");
+
+        assertNotNull(ctx, "历史明文会话不能因为加密改造就读不出来");
+        assertEquals("token-1", ctx.getLoginContext().getBotToken());
     }
 }

@@ -38,14 +38,14 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 每用户私有配置：猎聘 Token
+-- 每用户私有配置：猎聘 Token（密文存储：AES-256-GCM，enc:v1: 前缀，由 FieldCipher 加解密）
 CREATE TABLE IF NOT EXISTS user_config (
     user_id VARCHAR(64) PRIMARY KEY,
     liepin_token VARCHAR(1024),
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 微信 Bot 会话
+-- 微信 Bot 会话（bot_token / resume_json 均为密文：AES-256-GCM，enc:v1: 前缀）
 CREATE TABLE IF NOT EXISTS wechat_session (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     bot_id VARCHAR(64) UNIQUE,
