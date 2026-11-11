@@ -42,9 +42,11 @@ jobs:
 
       - name: Init MySQL schema
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq default-mysql-client
-          mysql -h 127.0.0.1 -uroot -proot < deploy/mysql/init.sql
+          # 直接用已拉起的 mysql:8.0 镜像里的客户端加载建表脚本，
+          # 不依赖 apt-get install default-mysql-client（runner 外网/DNS 抖动时会红）
+          docker run --rm --network host -i \
+            -e MYSQL_PWD=root mysql:8.0 \
+            mysql -h 127.0.0.1 -uroot < deploy/mysql/init.sql
 
       - name: Test
         env:
